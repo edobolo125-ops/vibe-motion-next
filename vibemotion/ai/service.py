@@ -46,19 +46,21 @@ class FallbackProvider:
         raise first
 
 
-def _single(s: Settings, name: str, on_log, max_tokens: int | None = None) -> Provider:
+def _single(s: Settings, name: str, on_log, max_tokens: int | None = None, timeout: int | None = None,
+            for_test: bool = False) -> Provider:
+    kw = {"timeout": timeout} if timeout else {}
     if name == "gemini":
         if not s.gemini_keys:
             raise AIError("API key Gemini kosong. Isi di tab Pengaturan.")
-        return GeminiProvider(s.gemini_keys, s.gemini_model, on_log, fallback_models=s.gemini_fallbacks,
-                              max_output_tokens=max_tokens)
+        return GeminiProvider(s.gemini_keys, s.gemini_model, on_log, fallback_models=None if for_test else s.gemini_fallbacks,
+                              max_output_tokens=max_tokens, **kw)
     if name == "anthropic":
         if not s.anthropic_key:
             raise AIError("API key Anthropic kosong. Isi di tab Pengaturan.")
-        return AnthropicProvider(s.anthropic_key, s.anthropic_model, **({"max_tokens": max_tokens} if max_tokens else {}))
+        return AnthropicProvider(s.anthropic_key, s.anthropic_model, **({"max_tokens": max_tokens} if max_tokens else {}), **kw)
     if not s.openai_key:
         raise AIError("API key kosong. Isi di tab Pengaturan.")
-    return OpenAICompatProvider(s.openai_base_url, s.openai_key, s.openai_model, max_tokens=max_tokens)
+    return OpenAICompatProvider(s.openai_base_url, s.openai_key, s.openai_model, max_tokens=max_tokens, **kw)
 
 
 def model_name(s: Settings) -> str:

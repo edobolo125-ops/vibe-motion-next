@@ -7,7 +7,7 @@ from typing import Callable
 
 import requests
 
-from .base import AIError, ModelNotFound, Overloaded, RateLimited, read_image_b64
+from .base import AIError, ModelNotFound, Overloaded, RateLimited, TimedOut, read_image_b64
 
 API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -44,7 +44,10 @@ class GeminiProvider:
         self.http = session or requests.Session()
 
     def _call(self, key: str, payload: dict, model: str) -> str:
-        r = self.http.post(API.format(model=model), params={"key": key}, json=payload, timeout=self.timeout)
+        try:
+            r = self.http.post(API.format(model=model), params={"key": key}, json=payload, timeout=self.timeout)
+        except requests.Timeout as e:
+            raise TimedOut(f"tidak ada jawaban dalam {self.timeout} detik") from e
         if r.status_code != 200:
             if is_limit_error(r.status_code, r.text):
                 raise RateLimited(r.text[:300])
@@ -65,6 +68,7 @@ class GeminiProvider:
 
     def _try_model(self, model: str, payload: dict, attempts: int) -> str:
         last: Exception | None = None
+        timeouts = 0
         for n in range(attempts):
             try:
                 return self._call(self.ring.current(), payload, model)
@@ -74,11 +78,17 @@ class GeminiProvider:
                 self.ring.rotate()
             except Overloaded as e:
                 last = e
+                if isinstance(e, TimedOut):
+                    timeouts += 1
+                    if timeouts >= 2:  # tiap timeout bisa memakan menit: jangan menunggu berkali-kali pada model yang sama
+                        break
                 if n < attempts - 1:
                     self.on_log(f"[Gemini] {model}: {e}, coba lagi… ({n + 1}/{attempts})")
                     time.sleep(min(2 ** (n + 1), 20))
         msg = f"Semua key/percobaan gagal: {last}"
-        raise (RateLimited(msg) if isinstance(last, RateLimited) else Overloaded(msg))
+        if isinstance(last, RateLimited):
+            raise RateLimited(msg)
+        raise (TimedOut(msg) if isinstance(last, TimedOut) else Overloaded(msg))  # pertahankan jenis kesalahan
 
     def complete(self, system: str, user: str, images: list[Path] | None = None) -> str:
         parts: list[dict] = [{"text": user}]

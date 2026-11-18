@@ -9,6 +9,9 @@ from ..core.errors import friendly_message
 from .service import _single
 
 
+TEST_TIMEOUT = 45  # detik; tes koneksi tidak boleh menggantung 3 menit
+
+
 @dataclass(frozen=True)
 class TestResult:
     __test__ = False  # bukan kelas tes pytest
@@ -27,7 +30,7 @@ def check_connection(settings: Settings, provider: str | None = None) -> TestRes
     # token keluaran kecil → murah; Gemini diberi lebih longgar karena model "thinking" memakai token untuk berpikir
     limit = {"gemini": 512, "anthropic": 32}.get(name, 64)
     try:
-        text = _single(settings, name, None, max_tokens=limit).complete("Balas hanya dengan satu kata: OK", "ping")
+        text = _single(settings, name, None, max_tokens=limit, timeout=TEST_TIMEOUT, for_test=True).complete("Balas hanya dengan satu kata: OK", "ping")
     except Exception as e:  # noqa: BLE001 — semua kegagalan dijelaskan ke pengguna
         return TestResult(False, friendly_message(e, settings.language), time.time() - started)
     took = time.time() - started

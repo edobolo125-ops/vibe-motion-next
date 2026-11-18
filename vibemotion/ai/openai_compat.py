@@ -5,7 +5,7 @@ from pathlib import Path
 
 import requests
 
-from .base import AIError, Overloaded, RateLimited, read_image_b64
+from .base import AIError, Overloaded, RateLimited, TimedOut, read_image_b64
 
 
 class OpenAICompatProvider:
@@ -28,8 +28,11 @@ class OpenAICompatProvider:
                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}]}
         if self.max_tokens:
             payload["max_tokens"] = self.max_tokens
-        r = self.http.post(self.url, json=payload, timeout=self.timeout,
-                           headers={"Authorization": f"Bearer {self.key}"})
+        try:
+            r = self.http.post(self.url, json=payload, timeout=self.timeout,
+                               headers={"Authorization": f"Bearer {self.key}"})
+        except requests.Timeout as e:
+            raise TimedOut(f"tidak ada jawaban dalam {self.timeout} detik") from e
         if r.status_code == 429:
             raise RateLimited(r.text[:300])
         if r.status_code >= 500:

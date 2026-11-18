@@ -129,3 +129,9 @@ Build pertama di GitHub Actions menemukan dua masalah yang tidak terlihat di Lin
 
 ## v0.14.2
 **Cek sekarang** di Pengaturan kini memakai alur yang sama dengan cek otomatis: bila ada versi baru muncul kotak hijau di sidebar (**Perbarui sekarang** pada versi `.exe`, **Unduh** pada versi `python run.py`), dan cek berulang tidak menumpuk kotak.
+
+## v0.14.3 — timeout Gemini
+Ditemukan saat uji nyata: **Tes koneksi** pernah menunggu 180 dtk lalu menyalahkan "internet" padahal server tersambung tetapi lambat (`ReadTimeout`).
+- Timeout kini dikenali sendiri (`TimedOut`): pesannya menjelaskan bahwa internet baik-baik saja dan modelnya yang lambat/sibuk, lengkap dengan saran (model lebih ringan, model/provider cadangan).
+- Tiap model hanya dicoba **2 kali** saat timeout (bukan 5 × 180 dtk), lalu otomatis beralih ke model/provider cadangan bila diisi.
+- **Tes koneksi** memakai batas 45 dtk dan hanya menguji model yang dipilih (tanpa cadangan).

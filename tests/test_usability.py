@@ -92,8 +92,9 @@ def test_max_tokens_sent_only_when_set():
 # ---------- tes koneksi ----------
 def patch_single(monkeypatch, provider=None, error=None):
     import vibemotion.ai.connection as c
-    def fake(s, name, on_log, max_tokens=None):
+    def fake(s, name, on_log, max_tokens=None, **kw):
         fake.args = (name, max_tokens)
+        fake.kw = kw
         if error: raise error
         return provider
     monkeypatch.setattr(c, "_single", fake)
@@ -142,3 +143,11 @@ def test_new_settings_defaults_and_roundtrip(tmp_path):
     s = Settings(); assert s.onboarded is False and s.price_in == 0.0 and s.price_out == 0.0
     f = tmp_path / "c.json"; Settings(price_in=0.3, price_out=2.5, onboarded=True).save(f)
     t = Settings.load(f); assert (t.price_in, t.price_out, t.onboarded) == (0.3, 2.5, True)
+
+
+def test_connection_test_uses_short_timeout_and_no_fallback_models(monkeypatch):
+    class P:
+        def complete(self, s, u, images=None): return "OK"
+    f = patch_single(monkeypatch, P())
+    assert check_connection(Settings()).ok
+    assert f.kw == {"timeout": 45, "for_test": True}  # tes koneksi: tidak menggantung 3 menit, hanya model yang dipilih

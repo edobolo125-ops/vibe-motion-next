@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 
-from .base import AIError, Overloaded, RateLimited, read_image_b64
+from .base import AIError, Overloaded, RateLimited, TimedOut, read_image_b64
 
 URL = "https://api.anthropic.com/v1/messages"
 VERSION = "2023-06-01"
@@ -32,7 +32,10 @@ class AnthropicProvider:
         headers = {"x-api-key": self.key, "anthropic-version": VERSION, "content-type": "application/json"}
         last = ""
         for n in range(3):
-            r = self.http.post(URL, json=payload, headers=headers, timeout=self.timeout)
+            try:
+                r = self.http.post(URL, json=payload, headers=headers, timeout=self.timeout)
+            except requests.Timeout as e:
+                raise TimedOut(f"tidak ada jawaban dalam {self.timeout} detik") from e
             if r.status_code == 200:
                 try:
                     data = r.json()

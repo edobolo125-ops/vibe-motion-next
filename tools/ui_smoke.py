@@ -43,6 +43,17 @@ def shot(name):
     ImageGrab.grab(bbox=(x, y, x + app.winfo_width(), y + app.winfo_height()), xdisplay=os.environ["DISPLAY"]).save(f"{os.environ.get('SHOTS', tmp)}/{name}.png")
 
 try:
+    import json as _j
+    from vibemotion.core.updater import UpdateInfo as _UI
+    import vibemotion.app as _am
+    _cfg = os.path.join(tmp, "VibeMotionNext"); os.makedirs(_cfg, exist_ok=True)
+    open(os.path.join(_cfg, "config.json"), "w", encoding="utf-8").write(_j.dumps({"update_url": "https://github.com/o/r", "check_updates": True}))
+    _startup_calls = []
+    def _fake_check(url, cur):
+        _startup_calls.append((url, cur))
+        return _UI("v0.99", "https://github.com/o/r/releases/tag/v0.99", "n", "https://github.com/o/r/releases/download/v0.99/VibeMotionNext-Setup-0.99.exe", "VibeMotionNext-Setup-0.99.exe", "a" * 64, 10)
+    _am.check_update = _fake_check
+    _am.can_self_update = lambda: True
     app = App(); pump(500)
     ctx, ed = app.ctx, app.editor
     check("judul memuat versi", __version__ in app.title())
@@ -59,6 +70,8 @@ try:
             except Exception: pass
             out += texts(c)
         return out
+    check("cek otomatis saat dibuka memakai alamat tersimpan", len(_startup_calls) == 1 and _startup_calls[0][0] == "https://github.com/o/r", _startup_calls)
+    check("cek otomatis saat dibuka memunculkan tombol Perbarui sekarang", getattr(app, "update_btn", None) is not None and app.update_btn.cget("text") == app.ctx.tr("update.now"), getattr(getattr(app, "update_btn", None), "cget", lambda x: None)("text"))
     wz = toplevels(app)
     check("panduan awal muncul otomatis", len(wz) == 1, wz)
     if wz:

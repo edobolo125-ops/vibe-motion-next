@@ -19,6 +19,11 @@ _RULES: list[tuple[re.Pattern, dict[str, str]]] = [
     (re.compile(r"^\s*5\d\d\b|(?:server|http|gemini|claude|status|error)\W{0,3}5\d\d\b|overloaded|unavailable|server sibuk|tidak tersedia|semua model gemini", re.I), {
         "id": "Server AI sedang sibuk (bukan salah pengaturan Anda). Coba lagi beberapa menit lagi, ganti ke model yang lebih ringan, atau isi Model cadangan / Provider cadangan di Pengaturan.",
         "en": "The AI server is busy (not a problem with your settings). Retry in a few minutes or switch to a lighter model."}),
+    (re.compile(r"ReadTimeout|Read timed out|tidak ada jawaban|TimedOut|ConnectTimeout", re.I), {
+        "id": "Server tersambung tetapi tidak menjawab tepat waktu. Internet Anda baik-baik saja; modelnya yang lambat atau sedang sibuk. "
+              "Coba model yang lebih ringan (mis. flash-lite), isi Model cadangan di Pengaturan, atau ulangi beberapa menit lagi.",
+        "en": "The server connected but did not answer in time. Your internet is fine; the model is slow or busy. "
+              "Try a lighter model (e.g. flash-lite), set a backup model in Settings, or retry in a few minutes."}),
     (re.compile(r"ConnectionError|Max retries exceeded|getaddrinfo|Name or service not known|timed out|Timeout|"
                 r"Failed to establish", re.I), {
         "id": "Tidak bisa terhubung ke internet/server. Periksa koneksi, VPN, atau firewall, lalu coba lagi.",

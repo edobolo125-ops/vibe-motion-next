@@ -18,6 +18,10 @@ class Overloaded(AIError):
     """Server sibuk/tidak tersedia setelah dicoba ulang — pemanggil boleh beralih ke cadangan."""
 
 
+class TimedOut(Overloaded):
+    """Koneksi tersambung tetapi server tidak menjawab tepat waktu (model lambat/sibuk) — bukan masalah internet."""
+
+
 class ModelNotFound(AIError):
     """Model tidak ada / tidak tersedia untuk akun ini (HTTP 404)."""
 
