@@ -123,3 +123,6 @@ Opsi boleh digabung. Installer dipasang ke folder sementara dan dihapus kembali;
 - **Perbarui sekarang** di dalam aplikasi (versi `.exe`): unduh installer dari Release GitHub, verifikasi SHA-256, pasang senyap. Host, nama berkas, ukuran, pengalihan, dan checksum dibatasi ketat (lihat `RELEASING.md`).
 - Workflow GitHub kini **menguji `.exe` dan installer di Windows sungguhan** (pasang senyap → selftest → uninstall → data selamat) sebelum mengunggah hasil.
 - `RELEASING.md`: langkah rilis lengkap lewat PowerShell (`gh`), termasuk catatan bahwa repo harus publik untuk pembaruan otomatis.
+
+## CI Windows (v0.14.1)
+Build pertama di GitHub Actions menemukan dua masalah yang tidak terlihat di Linux, kini diperbaiki: tes yang membutuhkan PyYAML (tidak ada di `requirements-dev.txt`), dan `tools/check_windows.py` yang akan crash mencetak ✔ ke keluaran bersandi cp1252 (kini UTF-8 paksa di alat dan `PYTHONUTF8=1` di workflow). 206 dari 207 tes sudah lolos di Windows sungguhan pada run pertama.

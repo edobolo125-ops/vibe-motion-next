@@ -20,6 +20,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+for _stream in (sys.stdout, sys.stderr):  # keluaran yang diteruskan (CI/pipa) di Windows bersandi cp1252: jangan crash di ✔ / ›
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 results: list[tuple[str, str, str]] = []  # (status, nama, detail)
 
 
@@ -119,7 +125,7 @@ def check_installer(setup: Path) -> None:
     marker = appdata / "_marker_uji_uninstall.txt"
     marker.write_text("data pengguna harus selamat setelah uninstall", encoding="utf-8")
     with tempfile.TemporaryDirectory() as d:
-        target = Path(d) / "Vibe Motion Next"
+        target = Path(d) / "VMN"
         log = Path(d) / "setup.log"
         p = subprocess.run([str(setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOICONS",
                             f"/DIR={target}", f"/LOG={log}"], timeout=600)
@@ -133,8 +139,11 @@ def check_installer(setup: Path) -> None:
             u = subprocess.run([str(unins), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=300)
             check("uninstall senyap sukses", u.returncode == 0, f"kode {u.returncode}")
             import time
-            time.sleep(3)
-            check("folder program terhapus", not exe.exists())
+            for _ in range(60):  # uninstaller menyerahkan pekerjaan ke proses lain; tunggu sampai berkas hilang
+                if not exe.exists():
+                    break
+                time.sleep(1)
+            check("folder program terhapus", not exe.exists(), "masih ada setelah 60 detik")
     check("data pengguna (AppData) selamat setelah uninstall", marker.exists())
     marker.unlink(missing_ok=True)
 

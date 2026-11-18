@@ -14,6 +14,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+for _stream in (sys.stdout, sys.stderr):  # keluaran yang diteruskan (CI/pipa) di Windows bersandi cp1252: jangan crash di ✔ / ›
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 
 def find_iscc() -> str | None:
     """Cari kompilator Inno Setup: PATH dulu, lalu lokasi instalasi standar (choco tidak selalu mengubah PATH)."""

@@ -77,7 +77,7 @@ def test_find_iscc_uses_path_then_standard_dirs(monkeypatch, tmp_path):
 
 
 def test_workflow_tests_installer_on_real_windows_and_yaml_is_valid():
-    import yaml
+    yaml = pytest.importorskip("yaml")  # PyYAML ada di requirements-dev; dilewati bila tidak terpasang
     wf = yaml.safe_load((ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8"))
     names = [s.get("name", "") for s in wf["jobs"]["windows"]["steps"]]
     assert any("Uji pada Windows" in n for n in names)
@@ -89,3 +89,19 @@ def test_release_notes_exist_and_tag_versions_compare_correctly():
     from vibemotion.core.updater import is_newer
     assert (ROOT / "RELEASING.md").exists()
     assert not is_newer("v0.14.0", "0.14-distribusi") and is_newer("v0.14.1", "0.14-distribusi") and is_newer("v0.15.0", "0.14-distribusi")
+
+
+def test_tools_survive_cp1252_stdout():
+    """Regresi dari CI Windows: keluaran yang diteruskan bersandi cp1252 dulu membuat ✔ meledak (UnicodeEncodeError)."""
+    import os, subprocess
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    env.pop("PYTHONUTF8", None)
+    r = subprocess.run([sys.executable, str(ROOT / "tools" / "check_windows.py")], capture_output=True, env=env, timeout=120)
+    out = r.stdout.decode("utf-8", "replace") + r.stderr.decode("utf-8", "replace")
+    assert r.returncode == 0 and "UnicodeEncodeError" not in out and "Ringkasan" in out, out[-400:]
+
+
+def test_workflow_forces_utf8_and_uses_dev_requirements():
+    text = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+    assert 'PYTHONUTF8: "1"' in text and "requirements-dev.txt" in text
+    assert "pyyaml" in (ROOT / "requirements-dev.txt").read_text(encoding="utf-8").lower()
