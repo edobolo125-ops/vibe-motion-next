@@ -266,6 +266,23 @@ try:
     n = len(popups); app._do_update(info); wait(lambda: len(popups) > n)
     check("unduhan gagal → peringatan jelas, tidak ada instalasi", popups[-1][0] == "showwarning" and "Checksum" in popups[-1][2] and not launched, popups[-1:])
     check("tombol pembaruan aktif lagi setelah gagal", wait(lambda: app.update_btn.cget("state") == "normal"))
+
+    # -- "Cek sekarang" di Pengaturan memakai kotak pembaruan di sidebar (satu alur)
+    import vibemotion.ui.settings_tab as stt2
+    app.show("settings"); pump(100)
+    appmod.can_self_update = lambda: True
+    first_box = getattr(app, "_update_box", None)
+    stt2.check_update = lambda url, cur: info
+    n = len(popups); app.tabs["settings"].update_url.delete(0, "end"); app.tabs["settings"].update_url.insert(0, "https://github.com/o/r")
+    app.tabs["settings"].check_now(); wait(lambda: len(popups) > n)
+    check("Cek sekarang: pesan menunjuk ke tombol sidebar", popups[-1][0] == "showinfo" and "v0.99" in popups[-1][2] and "sidebar" in popups[-1][2], popups[-1:])
+    check("Cek sekarang: tombol Perbarui sekarang muncul", app.update_btn.cget("text") == ctx.tr("update.now"), app.update_btn.cget("text"))
+    second_box = app._update_box
+    n = len(popups); app.tabs["settings"].check_now(); wait(lambda: len(popups) > n); pump(100)
+    check("cek berulang tidak menumpuk kotak (yang lama dihancurkan)", app._update_box is not second_box and not second_box.winfo_exists())
+    stt2.check_update = lambda url, cur: None
+    n = len(popups); app.tabs["settings"].check_now(); wait(lambda: len(popups) > n)
+    check("tanpa pembaruan: 'sudah versi terbaru'", popups[-1][0] == "showinfo" and "terbaru" in popups[-1][2], popups[-1:])
     # error ramah
     gt.make_provider = lambda s, log=None, meter=None: (_ for _ in ()).throw(RuntimeError("Gemini 400: API_KEY_INVALID"))
     app.show("generate"); g.btn.configure(state="normal"); g.generate(); pump(100)

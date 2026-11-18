@@ -1,1 +1,1 @@
-__version__ = "0.14.1-ci-windows"
+__version__ = "0.14.2-update-sidebar"

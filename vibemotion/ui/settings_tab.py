@@ -135,6 +135,12 @@ class SettingsTab(ctk.CTkScrollableFrame):
         def ok(info):
             if info is None:
                 messagebox.showinfo(ctx.tr("info.title"), ctx.tr("set.up_to_date", v=__version__))
+                return
+            show = ctx.actions.get("show_update")
+            if show:  # tombol "Perbarui sekarang" / "Unduh" di sidebar (satu alur untuk cek otomatis & manual)
+                show(info)
+                messagebox.showinfo(ctx.tr("info.title"), ctx.tr("set.update_found", v=info.version) + "\n\n"
+                                    + ctx.tr("update.see_sidebar") + ("\n\n" + info.notes[:300] if info.notes else ""))
             elif messagebox.askyesno(ctx.tr("info.title"), ctx.tr("set.update_found", v=info.version) + "\n\n" + info.notes[:300]):
                 import webbrowser
                 webbrowser.open(info.url)

@@ -61,6 +61,7 @@ class App(ctk.CTk):
             b.pack(fill="x", padx=8, pady=2)
             self.nav[key] = b
         ctx.show_tab = self.show
+        ctx.actions["show_update"] = self._show_update
         self.show("generate")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.sidebar = sidebar
@@ -101,7 +102,10 @@ class App(ctk.CTk):
         if info is None:
             return
         ctx = self.ctx
-        box = ctk.CTkFrame(self.sidebar, fg_color="#1f6f43")
+        old = getattr(self, "_update_box", None)
+        if old is not None:  # cek berulang tidak boleh menumpuk kotak
+            old.destroy()
+        box = self._update_box = ctk.CTkFrame(self.sidebar, fg_color="#1f6f43")
         box.pack(side="bottom", fill="x", padx=8, pady=10)
         self.update_status = ctk.CTkLabel(box, text=ctx.tr("set.update_found", v=info.version), wraplength=140)
         self.update_status.pack(padx=6, pady=(6, 2))

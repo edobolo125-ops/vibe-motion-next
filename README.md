@@ -126,3 +126,6 @@ Opsi boleh digabung. Installer dipasang ke folder sementara dan dihapus kembali;
 
 ## CI Windows (v0.14.1)
 Build pertama di GitHub Actions menemukan dua masalah yang tidak terlihat di Linux, kini diperbaiki: tes yang membutuhkan PyYAML (tidak ada di `requirements-dev.txt`), dan `tools/check_windows.py` yang akan crash mencetak ✔ ke keluaran bersandi cp1252 (kini UTF-8 paksa di alat dan `PYTHONUTF8=1` di workflow). 206 dari 207 tes sudah lolos di Windows sungguhan pada run pertama.
+
+## v0.14.2
+**Cek sekarang** di Pengaturan kini memakai alur yang sama dengan cek otomatis: bila ada versi baru muncul kotak hijau di sidebar (**Perbarui sekarang** pada versi `.exe`, **Unduh** pada versi `python run.py`), dan cek berulang tidak menumpuk kotak.

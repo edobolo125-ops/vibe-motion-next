@@ -67,7 +67,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "gen.prompts": "Saved prompts", "gen.prompt_save": "Save prompt", "gen.prompt_del": "Delete", "gen.prompt_name": "Prompt name…",
         "gen.compare": "Compare with another model", "gen.compare_model": "Comparison model name", "gen.pick_prompt": "Choose…", "update.now": "Update now", "update.confirm": "Download and install version {v} now?\n\nThe app will close, the update installs silently, then reopen the app from the Start Menu.",
         "update.downloading": "Downloading {pct}%…", "update.unverified": "This release has no checksum, so the download could not be verified.\n\nInstall anyway?",
-        "update.failed": "The update could not be installed:", "update.verified": "Download verified (SHA-256). Installing…", "set.diag": "Diagnostics", "set.open_log": "Open log folder", "set.copy_diag": "Copy diagnostic info", "set.diag_copied": "Diagnostic info copied. Paste it when reporting a problem (API keys are not included).",
+        "update.failed": "The update could not be installed:", "update.verified": "Download verified (SHA-256). Installing…", "update.see_sidebar": "Click the green button at the bottom left of the sidebar to update.", "set.diag": "Diagnostics", "set.open_log": "Open log folder", "set.copy_diag": "Copy diagnostic info", "set.diag_copied": "Diagnostic info copied. Paste it when reporting a problem (API keys are not included).",
     },
     "id": {
         "tab.generate": "Generate", "tab.editor": "Editor", "tab.run": "Preview & Render", "tab.settings": "Pengaturan",
@@ -134,7 +134,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "gen.prompts": "Prompt tersimpan", "gen.prompt_save": "Simpan prompt", "gen.prompt_del": "Hapus", "gen.prompt_name": "Nama prompt…",
         "gen.compare": "Bandingkan dengan model lain", "gen.compare_model": "Nama model pembanding", "gen.pick_prompt": "Pilih…", "update.now": "Perbarui sekarang", "update.confirm": "Unduh dan pasang versi {v} sekarang?\n\nAplikasi akan ditutup, pembaruan terpasang senyap, lalu buka lagi aplikasinya dari Start Menu.",
         "update.downloading": "Mengunduh {pct}%…", "update.unverified": "Rilis ini tidak punya checksum, jadi unduhan tidak bisa diverifikasi.\n\nTetap pasang?",
-        "update.failed": "Pembaruan tidak bisa dipasang:", "update.verified": "Unduhan terverifikasi (SHA-256). Memasang…", "set.diag": "Diagnostik", "set.open_log": "Buka folder log", "set.copy_diag": "Salin info diagnostik", "set.diag_copied": "Info diagnostik disalin. Tempel saat melaporkan masalah (API key tidak ikut).",
+        "update.failed": "Pembaruan tidak bisa dipasang:", "update.verified": "Unduhan terverifikasi (SHA-256). Memasang…", "update.see_sidebar": "Klik tombol hijau di kiri bawah sidebar untuk memperbarui.", "set.diag": "Diagnostik", "set.open_log": "Buka folder log", "set.copy_diag": "Salin info diagnostik", "set.diag_copied": "Info diagnostik disalin. Tempel saat melaporkan masalah (API key tidak ikut).",
     },
 }
 
