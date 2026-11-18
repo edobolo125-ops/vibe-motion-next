@@ -106,4 +106,12 @@ class AppContext:
 
     @property
     def selected(self):
-        return self.project.get(self.selected_id)
+        """Video terpilih. Bila id-nya sudah tidak ada (mis. dihapus dari bagian lain), pilih video pertama — tidak pernah KeyError."""
+        try:
+            return self.project.get(self.selected_id)
+        except KeyError:
+            if not self.project.items:
+                self.project.add()
+            first = self.project.items[0]
+            self.selected_id = first.id
+            return first

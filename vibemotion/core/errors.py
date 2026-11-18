@@ -19,6 +19,11 @@ _RULES: list[tuple[re.Pattern, dict[str, str]]] = [
     (re.compile(r"^\s*5\d\d\b|(?:server|http|gemini|claude|status|error)\W{0,3}5\d\d\b|overloaded|unavailable|server sibuk|tidak tersedia|semua model gemini", re.I), {
         "id": "Server AI sedang sibuk (bukan salah pengaturan Anda). Coba lagi beberapa menit lagi, ganti ke model yang lebih ringan, atau isi Model cadangan / Provider cadangan di Pengaturan.",
         "en": "The AI server is busy (not a problem with your settings). Retry in a few minutes or switch to a lighter model."}),
+    (re.compile(r"^KeyError:?\s*'?scene_\d+", re.I), {
+        "id": "Video yang dimaksud sudah tidak ada di proyek (mungkin dihapus atau diganti saat proses berjalan). "
+              "Coba ulangi; bila berulang, buka Pengaturan → Buka folder log dan kirim isi app.log.",
+        "en": "The video no longer exists in the project (it may have been deleted or replaced while a task was running). "
+              "Retry; if it repeats, open Settings → Open log folder and send app.log."}),
     (re.compile(r"ReadTimeout|Read timed out|tidak ada jawaban|TimedOut|ConnectTimeout", re.I), {
         "id": "Server tersambung tetapi tidak menjawab tepat waktu. Internet Anda baik-baik saja; modelnya yang lambat atau sedang sibuk. "
               "Coba model yang lebih ringan (mis. flash-lite), isi Model cadangan di Pengaturan, atau ulangi beberapa menit lagi.",

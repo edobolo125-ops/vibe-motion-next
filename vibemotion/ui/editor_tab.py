@@ -17,6 +17,7 @@ from ..core.code_utils import parse_duration_to_seconds
 from ..core.highlight import COLORS, tokenize
 from ..core.library import UserTemplates
 from ..core.portable import export_project, import_project
+from ..core.validate import has_remotion_export
 from ..core.presets import RENDER_PRESETS, apply_preset
 from ..core.textsearch import find_all, next_match, replace_all
 from ..core.thumbs import existing_thumb, make_thumbs
@@ -268,7 +269,10 @@ class EditorTab(ctk.CTkFrame):
         if self._loaded_id:
             self.ctx.project.snapshot(self._loaded_id, "manual")
         self._dirty = False
-        self.status.configure(text=self.ctx.tr("ed.saved"))
+        code = get_text(self.code)
+        warn = not has_remotion_export(code)
+        self.status.configure(text=self.ctx.tr("ed.save_warn_export") if warn else self.ctx.tr("ed.saved"),
+                              text_color="#e5a50a" if warn else ("gray10", "gray90"))
 
     def _on_key(self, event=None) -> None:
         # Ctrl+S / Ctrl+F / Ctrl+H bukan perubahan isi

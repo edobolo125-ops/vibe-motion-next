@@ -39,7 +39,7 @@ def test_set_audio_clamps_and_clears(tmp_path):
 def test_root_without_audio_is_unchanged_and_with_audio_wraps(tmp_path):
     p = Project(tmp_path); a = p.add(name="A", fps=30, duration_sec=10); b = p.add(name="B")
     plain = p.root_tsx()
-    assert "W_" not in plain and 'import { Composition } from "remotion"' in plain and "Audio" not in plain
+    assert "W_" not in plain and 'import { AbsoluteFill, Composition } from "remotion"' in plain and "<Audio" not in plain
     p.set_audio(a.id, music='assets/lagu "x".mp3', volume=0.4, voiceover="assets/vo.wav")
     root = p.root_tsx()
     assert "const W_scene_001" in root and "W_scene_002" not in root

@@ -296,6 +296,33 @@ try:
     stt2.check_update = lambda url, cur: None
     n = len(popups); app.tabs["settings"].check_now(); wait(lambda: len(popups) > n)
     check("tanpa pembaruan: 'sudah versi terbaru'", popups[-1][0] == "showinfo" and "terbaru" in popups[-1][2], popups[-1:])
+
+    # -- peringatan saat menyimpan kode tanpa `export const Remotion`
+    app.show("editor"); pump(100)
+    ed.set_code("export const Judul = () => null;"); ed._on_key(); ed.save(); pump(100)
+    check("simpan tanpa ekspor Remotion → peringatan", "⚠" in ed.status.cget("text") and "Remotion" in ed.status.cget("text"), ed.status.cget("text"))
+    ed.set_code('export const Remotion = () => null;'); ed._on_key(); ed.save(); pump(100)
+    check("simpan dengan ekspor Remotion → pesan normal", "⚠" not in ed.status.cget("text"), ed.status.cget("text"))
+
+    # -- id terpilih basi (video sudah tidak ada) tidak boleh memunculkan KeyError di UI
+    ctx.selected_id = "scene_999"
+    n = len(popups); ed.refresh(); app.tabs["run"].open_browser(); pump(150)
+    check("id terpilih basi → UI tetap jalan tanpa dialog error", ctx.selected_id != "scene_999" and len(popups) == n, popups[n:])
+    # -- generate sambil proyek diutak-atik: tidak ada KeyError (regresi log nyata)
+    import vibemotion.ui.generate_tab as gt2
+    class Meddle:
+        last_usage = (1, 1)
+        def complete(self, system, user, images=None):
+            for it in list(ctx.project.items)[:2]: ctx.project.remove(it.id)   # thread lain menghapus video saat AI bekerja
+            return 'export const Remotion = () => "ok";'
+    gt2.make_provider = lambda s_, log=None, meter=None: MeteredProvider(Meddle(), meter)
+    g = app.tabs["generate"]; app.show("generate"); pump(100)
+    g.mode.set(ctx.tr("gen.mode_single")); g.compare.deselect(); g.auto.deselect(); g.visual.deselect()
+    g.instruction.delete("1.0", "end"); g.instruction.insert("1.0", "uji balapan")
+    n_before = len(ctx.project.items); n = len(popups)
+    g.generate(); wait(lambda: g.btn.cget("state") == "normal", 20); pump(200)
+    check("generate saat proyek diutak-atik: selesai tanpa KeyError", len(popups) == n and len(ctx.project.items) >= 1, popups[n:])
+    check("hasil AI tetap masuk proyek", any("uji" in i.name.lower() or "Video" in i.name for i in ctx.project.items) and ctx.selected.code.endswith('"ok";\n'), ctx.selected.name)
     # error ramah
     gt.make_provider = lambda s, log=None, meter=None: (_ for _ in ()).throw(RuntimeError("Gemini 400: API_KEY_INVALID"))
     app.show("generate"); g.btn.configure(state="normal"); g.generate(); pump(100)

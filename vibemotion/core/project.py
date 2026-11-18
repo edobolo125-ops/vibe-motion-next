@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -61,10 +62,19 @@ class Project:
         self.root = Path(root)
         self.items: list[VideoItem] = []
         self.history = History(self.root)
+        # Proyek dipakai bersama thread UI dan thread AI/render. Kunci ini menjaga daftar & id agar tidak tabrakan,
+        # dan `_reserved` menahan id video yang SEDANG dibuat (belum masuk daftar) supaya tidak dipakai ulang.
+        self._lock = threading.RLock()
+        self._reserved: set[str] = set()
 
     def snapshot(self, video_id: str, label: str = "manual"):
-        """Simpan versi kode video ini ke riwayat (None bila tak berubah)."""
-        return self.history.snapshot(video_id, self.get(video_id).code, label)
+        """Simpan versi kode video ini ke riwayat (None bila tak berubah atau videonya sudah tidak ada)."""
+        with self._lock:
+            try:
+                code = self.get(video_id).code
+            except KeyError:
+                return None
+        return self.history.snapshot(video_id, code, label)
 
     # ---------- paths ----------
     @property
@@ -85,90 +95,133 @@ class Project:
 
     # ---------- items ----------
     def next_id(self) -> str:
-        used = [int(m.group(1)) for i in self.items if (m := _ID_RE.match(i.id))]
-        return f"scene_{(max(used) + 1) if used else 1:03d}"
+        with self._lock:
+            used = [int(m.group(1)) for i in self.items if (m := _ID_RE.match(i.id))]
+            used += [int(m.group(1)) for r in self._reserved if (m := _ID_RE.match(r))]
+            return f"scene_{(max(used) + 1) if used else 1:03d}"
 
     def add(self, code: str = PLACEHOLDER_CODE, name: str | None = None, **opts) -> VideoItem:
-        vid = self.next_id()
-        item = VideoItem(id=vid, name=name or f"Video {len(self.items) + 1}", code=code, **opts)
-        self.items.append(item)
-        return item
+        with self._lock:
+            vid = self.next_id()
+            item = VideoItem(id=vid, name=name or f"Video {len(self.items) + 1}", code=code, **opts)
+            self.items.append(item)
+            return item
+
+    def detached(self, code: str = PLACEHOLDER_CODE, name: str | None = None, **opts) -> VideoItem:
+        """Buat video DI LUAR daftar (id dipesan). Dipakai pekerjaan panjang (AI): video baru terlihat setelah `attach`."""
+        with self._lock:
+            vid = self.next_id()
+            self._reserved.add(vid)
+            return VideoItem(id=vid, name=name or f"Video {len(self.items) + 1}", code=code, **opts)
+
+    def attach(self, item: VideoItem) -> VideoItem:
+        """Masukkan video hasil `detached` ke daftar (idempoten)."""
+        with self._lock:
+            if not any(i.id == item.id for i in self.items):
+                self.items.append(item)
+            self._reserved.discard(item.id)
+            return item
+
+    def release(self, video_id: str) -> None:
+        """Lepas id yang dipesan (mis. generasi gagal)."""
+        with self._lock:
+            self._reserved.discard(video_id)
+
+    def contains(self, video_id: str) -> bool:
+        with self._lock:
+            return any(i.id == video_id for i in self.items)
 
     def get(self, video_id: str) -> VideoItem:
-        for item in self.items:
-            if item.id == video_id:
-                return item
+        with self._lock:
+            for item in self.items:
+                if item.id == video_id:
+                    return item
         raise KeyError(video_id)
 
     def remove(self, video_id: str) -> None:
-        self.items = [i for i in self.items if i.id != video_id]
+        with self._lock:
+            self.items = [i for i in self.items if i.id != video_id]
+            self._reserved.discard(video_id)
 
     def duplicate(self, video_id: str) -> VideoItem:
-        src = self.get(video_id)
-        copy = VideoItem(**{**asdict(src), "id": self.next_id(), "name": f"{src.name} (copy)"})
-        self.items.insert(self.items.index(src) + 1, copy)
-        return copy
+        with self._lock:
+            src = self.get(video_id)
+            copy = VideoItem(**{**asdict(src), "id": self.next_id(), "name": f"{src.name} (copy)"})
+            self.items.insert(self.items.index(src) + 1, copy)
+            return copy
 
     def variants(self, video_id: str, ratios: dict[str, tuple[int, int]]) -> list[VideoItem]:
         """Salin video ke beberapa ukuran/rasio. Nama: '<asli> (9:16)'. Kode sama (layout responsif via useVideoConfig)."""
-        src = self.get(video_id)
-        out: list[VideoItem] = []
-        at = self.items.index(src) + 1
-        for label, (w, h) in ratios.items():
-            if (w, h) == (src.width, src.height):
-                continue  # ukuran yang sama dengan sumber: tidak perlu varian
-            copy = VideoItem(**{**asdict(src), "id": self.next_id(), "name": f"{src.name} ({label})",
-                                "width": w, "height": h})
-            self.items.insert(at, copy)
-            at += 1
-            out.append(copy)
-        return out
+        with self._lock:
+            src = self.get(video_id)
+            out: list[VideoItem] = []
+            at = self.items.index(src) + 1
+            for label, (w, h) in ratios.items():
+                if (w, h) == (src.width, src.height):
+                    continue  # ukuran yang sama dengan sumber: tidak perlu varian
+                copy = VideoItem(**{**asdict(src), "id": self.next_id(), "name": f"{src.name} ({label})",
+                                    "width": w, "height": h})
+                self.items.insert(at, copy)
+                at += 1
+                out.append(copy)
+            return out
 
     def set_audio(self, video_id: str, music: str | None = None, volume: float | None = None,
                   voiceover: str | None = None) -> VideoItem:
         """None = biarkan; "" = hapus. Volume dijepit ke 0..1."""
-        it = self.get(video_id)
-        if music is not None:
-            it.music = music
-        if voiceover is not None:
-            it.voiceover = voiceover
-        if volume is not None:
-            it.music_volume = min(1.0, max(0.0, float(volume)))
-        return it
+        with self._lock:
+            it = self.get(video_id)
+            if music is not None:
+                it.music = music
+            if voiceover is not None:
+                it.voiceover = voiceover
+            if volume is not None:
+                it.music_volume = min(1.0, max(0.0, float(volume)))
+            return it
 
     def move(self, video_id: str, delta: int) -> None:
-        idx = next(i for i, it in enumerate(self.items) if it.id == video_id)
-        new = idx + delta
-        if 0 <= new < len(self.items):
-            self.items[idx], self.items[new] = self.items[new], self.items[idx]
+        with self._lock:
+            idx = next(i for i, it in enumerate(self.items) if it.id == video_id)
+            new = idx + delta
+            if 0 <= new < len(self.items):
+                self.items[idx], self.items[new] = self.items[new], self.items[idx]
 
     def merge(self, ids: list[str], name: str = "Merged") -> VideoItem:
         """Gabung beberapa video berurutan memakai <Series>."""
-        parts = [self.get(i) for i in ids]
-        if len(parts) < 2:
-            raise ValueError("need at least 2 videos")
-        imports, seq = [], []
-        for n, p in enumerate(parts, 1):
-            imports.append(f'import {{ Remotion as Part{n} }} from "./{p.id}";')
-            seq.append(f"      <Series.Sequence durationInFrames={{{p.frames}}}><Part{n} /></Series.Sequence>")
-        code = (
-            'import React from "react";\nimport { Series } from "remotion";\n'
-            + "\n".join(imports)
-            + "\n\nexport const Remotion: React.FC = () => (\n    <Series>\n"
-            + "\n".join(seq)
-            + "\n    </Series>\n);\n"
-        )
-        first = parts[0]
-        return self.add(code, name, width=first.width, height=first.height, fps=first.fps,
-                        duration_sec=sum(p.duration_sec for p in parts))
+        with self._lock:
+            parts = [self.get(i) for i in ids]
+            if len(parts) < 2:
+                raise ValueError("need at least 2 videos")
+            imports, seq = [], []
+            for n, p in enumerate(parts, 1):
+                imports.append(f'import {{ Remotion as Part{n} }} from "./{p.id}";')
+                seq.append(f"      <Series.Sequence durationInFrames={{{p.frames}}}><Part{n} /></Series.Sequence>")
+            code = (
+                'import React from "react";\nimport { Series } from "remotion";\n'
+                + "\n".join(imports)
+                + "\n\nexport const Remotion: React.FC = () => (\n    <Series>\n"
+                + "\n".join(seq)
+                + "\n    </Series>\n);\n"
+            )
+            first = parts[0]
+            return self.add(code, name, width=first.width, height=first.height, fps=first.fps,
+                            duration_sec=sum(p.duration_sec for p in parts))
 
     # ---------- persistence ----------
     def save(self) -> None:
+        with self._lock:
+            self._save_locked()
+
+    def _save_locked(self) -> None:
         self.write_files()
         meta = [{k: v for k, v in asdict(i).items() if k != "code"} for i in self.items]
         atomic_write(self.state_file, json.dumps(meta, indent=2, ensure_ascii=False))
 
     def load(self) -> None:
+        with self._lock:
+            self._load_locked()
+
+    def _load_locked(self) -> None:
         self.items = []
         meta: list = []
         try:
@@ -249,20 +302,36 @@ class Project:
         body = "\n".join(tracks)
         return (f"const W_{it.id}: React.FC = () => (\n  <AbsoluteFill>\n    <C_{it.id} />\n{body}\n  </AbsoluteFill>\n);\n")
 
+    # Pemilih komponen aman: video yang tidak mengekspor `Remotion` hanya menampilkan pesan error DI VIDEO ITU SAJA,
+    # tidak menjatuhkan seluruh Studio. Salinan namespace (Object.assign) menghindari peringatan webpack "export not found".
+    PICK_HELPER = (
+        "const pick = (id: string, mod: Record<string, any>): React.ComponentType<any> => {\n"
+        "  const m: Record<string, any> = Object.assign({}, mod);\n"
+        "  const c = m[\"Remotion\"] ?? m[\"default\"];\n"
+        "  if (typeof c === \"function\") return c;\n"
+        "  const Broken: React.FC = () => (\n"
+        "    <AbsoluteFill style={{ background: \"#7f1d1d\", color: \"#fff\", justifyContent: \"center\", alignItems: \"center\",\n"
+        "      fontFamily: \"Arial, sans-serif\", fontSize: 34, padding: 48, textAlign: \"center\", lineHeight: 1.4 }}>\n"
+        "      {`Video \"${id}\" tidak mengekspor komponen \"Remotion\".\\nBuka tab Editor dan pastikan kodenya memuat:\\nexport const Remotion = () => { ... }`}\n"
+        "    </AbsoluteFill>\n"
+        "  );\n"
+        "  return Broken;\n"
+        "};\n"
+    )
+
     def root_tsx(self) -> str:
-        imports = "\n".join(
-            f'import {{ Remotion as C_{i.id} }} from "./compositions/{i.id}";' for i in self.items
-        )
+        imports = "\n".join(f'import * as M_{i.id} from "./compositions/{i.id}";' for i in self.items)
+        picks = "\n".join(f'const C_{i.id} = pick("{i.id}", M_{i.id});' for i in self.items)
         wrapped = [i for i in self.items if i.has_audio]
         wrappers = ("\n" + "\n".join(self._audio_wrapper(i) for i in wrapped)) if wrapped else ""
-        names = "AbsoluteFill, Audio, Composition, interpolate, staticFile" if wrapped else "Composition"
+        names = "AbsoluteFill, Audio, Composition, interpolate, staticFile" if wrapped else "AbsoluteFill, Composition"
         comps = "\n".join(
             f'      <Composition id="{i.comp_id}" component={{{("W_" if i.has_audio else "C_") + i.id} as React.ComponentType<any>}} '
             f"durationInFrames={{{i.frames}}} fps={{{i.fps}}} width={{{i.width}}} height={{{i.height}}} />"
             for i in self.items
         )
         return (
-            f'import React from "react";\nimport {{ {names} }} from "remotion";\n{imports}\n{wrappers}\n'
+            f'import React from "react";\nimport {{ {names} }} from "remotion";\n{imports}\n\n{self.PICK_HELPER}\n{picks}\n{wrappers}\n'
             f"export const RemotionRoot: React.FC = () => {{\n  return (\n    <>\n{comps}\n    </>\n  );\n}};\n"
         )
 

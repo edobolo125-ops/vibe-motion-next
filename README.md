@@ -135,3 +135,17 @@ Ditemukan saat uji nyata: **Tes koneksi** pernah menunggu 180 dtk lalu menyalahk
 - Timeout kini dikenali sendiri (`TimedOut`): pesannya menjelaskan bahwa internet baik-baik saja dan modelnya yang lambat/sibuk, lengkap dengan saran (model lebih ringan, model/provider cadangan).
 - Tiap model hanya dicoba **2 kali** saat timeout (bukan 5 × 180 dtk), lalu otomatis beralih ke model/provider cadangan bila diisi.
 - **Tes koneksi** memakai batas 45 dtk dan hanya menguji model yang dipilih (tanpa cadangan).
+
+## v0.14.4 — Root.tsx aman
+Ditemukan saat uji nyata di Remotion Studio: satu video yang kodenya tidak mengekspor `Remotion` menjatuhkan SELURUH preview (`A value of undefined was passed to the component prop`), termasuk video yang baik.
+- `Root.tsx` kini memilih komponen lewat `pick()`: video bermasalah hanya menampilkan pesan merah yang jelas di dirinya sendiri; video lain tetap normal (diverifikasi dengan Remotion sungguhan: baik, salah nama ekspor, dan `export default`).
+- **Editor** memberi peringatan ⚠ saat menyimpan kode tanpa `export const Remotion`.
+- Pemeriksaan statis kini mengabaikan komentar (ekspor/`Math.random()` di dalam komentar tidak lagi menipu validator).
+
+## v0.14.5 — KeyError 'scene_007' (konkurensi)
+Dari log nyata: `generate_tab.work → pipeline._one → project.snapshot → project.get → KeyError: 'scene_007'`.
+Akar masalah: pipeline memasukkan video **kosong sementara** ke proyek bersama saat AI mulai bekerja (bisa menit-menit), lalu mencarinya lagi lewat daftar di akhir. Selama itu video kosong bisa dihapus/diutak-atik dari bagian lain, dan hasil AI hilang dengan error.
+- Video baru kini dibuat **di luar daftar** (`detached`, id dipesan) dan baru masuk (`attach`) setelah kodenya jadi; snapshot memakai objeknya sendiri.
+- `Project` aman antar-thread (kunci + id yang dipesan tidak dipakai ulang); `History` dan `atomic_write` juga (ditemukan oleh uji beban: nama berkas sementara bisa tabrakan).
+- `ctx.selected` tidak pernah `KeyError` (id basi → video pertama); pesan ramah bila tetap terjadi.
+- 10 tes konkurensi baru, termasuk uji beban 6 thread acak; ditulis dulu sebagai reproduksi (gagal sebelum perbaikan).

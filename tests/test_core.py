@@ -54,9 +54,11 @@ def test_project_roundtrip_and_root(tmp_path):
     b = p.add("export const Remotion = () => null;", name="B", fps=60, duration_sec=2)
     p.save()
     root = (tmp_path / "src" / "Root.tsx").read_text()
-    # akar masalah warning lama: tidak boleh ada `import * as` / .default / myCompSchema
-    assert "import * as" not in root and ".default" not in root and "myCompSchema" not in root
-    assert 'import { Remotion as C_scene_001 }' in root
+    # akar masalah warning lama: tidak boleh ada akses statis .default / myCompSchema (webpack "export not found");
+    # namespace disalin lewat Object.assign dan komponen dipilih aman oleh pick()
+    assert ".default" not in root and "myCompSchema" not in root and "UserModule" not in root
+    assert 'import * as M_scene_001 from "./compositions/scene_001"' in root and "Object.assign({}, mod)" in root
+    assert 'const C_scene_001 = pick("scene_001", M_scene_001);' in root
     assert "durationInFrames={120}" in root and 'id="scene-002"' in root
     pkg = json.loads((tmp_path / "package.json").read_text())
     assert pkg["dependencies"]["zod"] == "4.6.7"

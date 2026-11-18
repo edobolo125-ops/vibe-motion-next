@@ -30,17 +30,21 @@ def make_validator(project: Project, enabled: bool) -> Callable[[str], list[Issu
 
 def _one(svc: AIService, project: Project, item: VideoItem, spec: GenerationSpec, instruction: str,
          images: list[Path] | None, validator, visual: bool, still: StillRenderer, status: Status) -> list[Issue]:
+    """Bangun satu video. `item` sengaja TIDAK ada di daftar proyek selama AI bekerja (bisa menit-menit), jadi tidak
+    bisa dihapus/dipilih setengah jadi dari bagian UI lain. Ia baru masuk (`attach`) setelah kodenya jadi."""
     if visual:
         def render_candidate(code: str) -> Path:
             item.code = code
+            project.attach(item)  # render butuh video ada di Root.tsx; bila gagal, build() menariknya lagi
             project.save()
             return still(project, item, project.root / ".vm_review" / f"{item.id}.png")
         code, issues = generate_reviewed(svc, spec, instruction, images, validator, render_candidate, on_status=status)
     else:
         code, issues = generate_checked(svc, spec, instruction, images, validator, on_status=status)
     item.code = code
+    project.attach(item)
     project.save()
-    project.snapshot(item.id, "AI generate")
+    project.history.snapshot(item.id, item.code, "AI generate")  # lewat objek sendiri, bukan pencarian di daftar
     return issues
 
 
@@ -56,12 +60,12 @@ def generate_videos(svc: AIService, project: Project, spec: GenerationSpec, inst
     notes: list[str] = []
 
     def build(name: str, sp: GenerationSpec, instr: str) -> None:
-        item = project.add(PLACEHOLDER_CODE, name, width=sp.width, height=sp.height, fps=sp.fps,
-                           duration_sec=sp.duration_sec)
+        item = project.detached(PLACEHOLDER_CODE, name, width=sp.width, height=sp.height, fps=sp.fps,
+                                duration_sec=sp.duration_sec)
         try:
             issues = _one(svc, project, item, sp, instr, images, validator, visual_review, still, status)
         except Exception:
-            project.remove(item.id)
+            project.remove(item.id)  # bila sempat masuk (jalur tinjauan visual); juga melepas id yang dipesan
             project.save()
             raise
         made.append(item)
@@ -75,9 +79,12 @@ def generate_videos(svc: AIService, project: Project, spec: GenerationSpec, inst
             status(f"Adegan {i}/{len(plan)}: {sc.title}")
             build(sc.title + (f" · {label}" if label else ""), replace(spec, duration_sec=sc.seconds), scene_instruction(sc, i, len(plan), instruction))
         if merge and len(made) >= 2:
-            merged = project.merge([m.id for m in made], "Storyboard")
-            project.save()
-            made.append(merged)
+            try:
+                merged = project.merge([m.id for m in made if project.contains(m.id)], "Storyboard")
+                project.save()
+                made.append(merged)
+            except (KeyError, ValueError):
+                notes.append("Gabungan storyboard dilewati: ada adegan yang sudah dihapus.")
     else:
         for n in range(max(1, count)):
             status(f"Video {n + 1}/{count}")
@@ -96,18 +103,18 @@ def make_variations(svc: AIService, project: Project, video_id: str, n: int, *, 
     notes: list[str] = []
     for i in range(1, max(1, min(6, n)) + 1):
         status(f"Variasi {i}/{n}")
-        item = project.add(src.code, f"{src.name} · var {i}", width=src.width, height=src.height, fps=src.fps,
-                           duration_sec=src.duration_sec, music=src.music, music_volume=src.music_volume,
-                           voiceover=src.voiceover)
+        item = project.detached(src.code, f"{src.name} · var {i}", width=src.width, height=src.height, fps=src.fps,
+                                duration_sec=src.duration_sec, music=src.music, music_volume=src.music_volume,
+                                voiceover=src.voiceover)
         try:
             code, issues = edit_checked(svc, src.code, VARIATION_REQUEST.format(n=i), spec, validator, on_status=status)
         except Exception:
-            project.remove(item.id)
-            project.save()
+            project.release(item.id)
             raise
         item.code = code
+        project.attach(item)
         project.save()
-        project.snapshot(item.id, "AI variasi")
+        project.history.snapshot(item.id, item.code, "AI variasi")
         made.append(item)
         if issues:
             notes.append(f"{item.name}: " + "; ".join(str(x) for x in issues))

@@ -43,7 +43,25 @@ def _pkg_name(spec: str) -> str:
     return "/".join(parts[:2]) if spec.startswith("@") else parts[0]
 
 
+def _without_comments(code: str) -> str:
+    """Buang komentar (// dan /* */) memakai tokenizer — tanda // di dalam string ("https://…") tidak ikut terbuang."""
+    from .highlight import tokenize
+    out, last = [], 0
+    for kind, start, end in tokenize(code):
+        if kind == "comment":
+            out.append(code[last:start])
+            last = end
+    out.append(code[last:])
+    return "".join(out)
+
+
+def has_remotion_export(code: str) -> bool:
+    """Apakah kode mengekspor komponen `Remotion` (yang dicari Root.tsx)?"""
+    return bool(_EXPORT_OK.search(_without_comments(code)))
+
+
 def static_checks(code: str, root: Path | None = None) -> list[Issue]:
+    code = _without_comments(code)  # komentar tidak boleh memengaruhi pemeriksaan
     issues: list[Issue] = []
     if not _EXPORT_OK.search(code):
         issues.append(Issue("export", "Komponen harus diekspor sebagai `export const Remotion: React.FC = () => ...`."))
